@@ -1,20 +1,8 @@
 {
-  "name": "grunt-mocha",
-  "description": "Grunt task for running client-side Mocha specs in PhantomJS",
-  "version": "0.2.2",
-  "homepage": "https://github.com/kmiyashiro/grunt-mocha",
-  "author": {
-    "name": "Kelly Miyashiro",
-    "email": "miyashiro.kelly@gmail.com",
-    "url": "http://non-diligent.com"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git://github.com/kmiyashiro/grunt-mocha.git"
-  },
-  "bugs": {
-    "url": "https://github.com/kmiyashiro/grunt-mocha/issues"
-  },
+  "name": "grunt-mocha-phantom-hack",
+  "description": "Grunt task for running client-side Mocha specs in PhantomJS with reporters",
+  "version": "0.0.1",
+  "homepage": "https://github.com/gregrperkins/grunt-mocha-phantom-hack",
   "licenses": [
     {
       "type": "MIT",
@@ -29,18 +17,18 @@
     "test": "./node_modules/.bin/grunt test"
   },
   "dependencies": {
-    "grunt-lib-phantomjs": "https://github.com/gruntjs/grunt-lib-phantomjs/tarball/master"
+    "grunt-lib-phantomjs": "https://github.com/gruntjs/grunt-lib-phantomjs/tarball/master",
+    "mocha": "1.8.1",
+    "JSON2": "0.1.0"
   },
   "devDependencies": {
     "grunt": "~0.4.0rc6",
+    "grunt-cli": "~0.1.6",
     "grunt-contrib-connect": "~0.1",
     "grunt-contrib-internal": "*",
     "grunt-contrib-jshint": "0.1.1rc6"
   },
   "optionalDependencies": {
     "growl": "~1"
-  },
-  "keywords": [
-    "gruntplugin mocha test phantomjs"
-  ]
+  }
 }

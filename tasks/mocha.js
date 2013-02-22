@@ -14,6 +14,9 @@
 
  'use strict';
 
+var JSON2 = require('JSON2');
+var Mocha = require('mocha');
+
 module.exports = function(grunt) {
   // Nodejs libs.
   var path = require('path');
@@ -62,64 +65,86 @@ module.exports = function(grunt) {
     }
   }
 
+  // ----------------------------------------------------------------------
   // Mocha hooks.
-  phantomjs.on('mocha.suiteStart', function(name) {
-    unfinished[name] = true;
-    currentModule = name;
+  // ----------------------------------------------------------------------
+  var mocha = new Mocha({
+    // useColors: true, // TODO(gregp)
+    timeout: 2000,
+    reporter: 'spec',
   });
+  var runner = {};
+  runner.__proto__ = Mocha.Runner.prototype;
+  var reporter = new mocha._reporter(runner);
 
-  phantomjs.on('mocha.suiteDone', function(name, failed, passed, total) {
-    delete unfinished[name];
-  });
-
-  phantomjs.on('mocha.testStart', function(name) {
-    currentTest = (currentModule ? currentModule + ' - ' : '') + name;
-    grunt.verbose.write(currentTest + '...');
-  });
-
-  phantomjs.on('mocha.testFail', function(name, result) {
-      result.testName = currentTest;
-      failedAssertions.push(result);
-  });
-
-  phantomjs.on('mocha.testDone', function(title, state) {
-    // Log errors if necessary, otherwise success.
-    if (state === 'failed') {
-      // list assertions
-      if (grunt.option('verbose')) {
-        grunt.log.error();
-        logFailedAssertions();
-      } else {
-        grunt.log.write('F'.red);
+  // Add each of the handlers
+  [
+  'end',       // ==> 'mocha.end'
+  'fail',      // ==> 'mocha.fail'
+  'hook end',  // ==> 'mocha.hook_end'
+  'hook',      // ==> 'mocha.hook'
+  'pass',      // ==> 'mocha.pass'
+  'pending',   // ==> 'mocha.pending'
+  'start',     // ==> 'mocha.start'
+  'suite end', // ==> 'mocha.suite_end'
+  'suite',     // ==> 'mocha.suite'
+  'test end',  // ==> 'mocha.test_end'
+  'test',      // ==> 'mocha.test'
+  ].forEach(function (key) {
+    // Listen for the prefixed event type
+    var gruntMochaKey = 'mocha.' + key.replace(/ /g, '_');
+    phantomjs.on(gruntMochaKey, function () {
+      if (key == 'end') {
+        phantomjs.halt();
       }
-    } else {
-      grunt.verbose.ok().or.write('.');
-    }
+      // Convert all the args from json
+      var args = [].slice.call(arguments).map(_fromJson);
+      args.unshift(key);
+      // console.log(args);
+      runner.emit.apply(runner, args);
+    });
   });
 
-  phantomjs.on('mocha.done', function(failed, passed, total, duration) {
-    phantomjs.halt();
-    var nDuration = parseFloat(duration) || 0;
-    status.failed += failed;
-    status.passed += passed;
-    status.total += total;
-    status.duration += Math.round(nDuration*100)/100;
-    // Print assertion errors here, if verbose mode is disabled.
-    if (!grunt.option('verbose')) {
-      if (failed > 0) {
-        grunt.log.writeln();
-        logFailedAssertions();
-      } else {
-        grunt.log.ok();
+  function _mochaEntity (key, value) {
+    if (value && typeof value === 'object') {
+      var type = value['$jsonClass'];
+      if (typeof type === 'string' && type.indexOf('Mocha.') === 0) {
+        var subtype = type.slice('Mocha.'.length);
+        switch (subtype) {
+          case 'Context':
+          case 'Hook':
+          case 'Suite':
+          case 'Test':
+            value.__proto__ = Mocha[subtype].prototype;
+        }
       }
     }
-  });
+    return value;
+  }
 
-  // Re-broadcast qunit events on grunt.event.
-  phantomjs.on('mocha.*', function() {
-    var args = [this.event].concat(grunt.util.toArray(arguments));
-    grunt.event.emit.apply(grunt.event, args);
-  });
+  function _fromJson(json) {
+    return JSON2.retrocycle(JSON2.parse(json, _mochaEntity));
+  }
+
+  function _resetGruntMocha() {
+    // Reset current module.
+    currentModule = null;
+  }
+
+
+  // // Re-broadcast qunit events on grunt.event.
+  // phantomjs.on('mocha.*', function() {
+  //   var args = [this.event].concat(grunt.util.toArray(arguments));
+  //   grunt.event.emit.apply(grunt.event, args);
+  // });
+
+  // ----------------------------------------------------------------------
+  // END Mocha hooks.
+  // ----------------------------------------------------------------------
+
+
+
+
 
   // Built-in error handlers.
   phantomjs.on('fail.load', function(url) {
@@ -135,7 +160,6 @@ module.exports = function(grunt) {
     grunt.warn('PhantomJS timed out, possibly due to a missing Mocha run() call.', 90);
   });
 
-  
   // console.log pass-through.
   phantomjs.on('console', console.log.bind(console));
 
@@ -176,8 +200,7 @@ module.exports = function(grunt) {
       var basename = path.basename(url);
       grunt.verbose.subhead('Testing ' + basename).or.write('Testing ' + basename);
 
-      // Reset current module.
-      currentModule = null;
+      _resetGruntMocha();
 
       // Launch PhantomJS.
       phantomjs.spawn(url, {
